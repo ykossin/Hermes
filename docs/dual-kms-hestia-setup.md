@@ -1,3 +1,5 @@
+> English guide. Russian: [dual-kms-hestia-setup.ru.md](dual-kms-hestia-setup.ru.md)
+
 # Hermes-KMS dual Hestia setup
 
 Example deployment: a Hermes host with Hermes-KMS and two simultaneous Hestia clients (physical monitor plus two virtual outputs).
@@ -150,7 +152,7 @@ If the client asks for **more** than the host panel or connector supports, clamp
 
 ### Hestia clients
 
-Use `POST /api/hestia/session/prepare` before launch. Pass `stream.requested_width/height` for the encode target. Fields `client.display_width/height` are validated today but not yet used to clamp; a sensible rule is `effective = min(requested, host_native_max)` for upscale attempts and `effective = requested` for downscale on virtual outputs.
+Use `POST /api/hestia/session/prepare` before launch. Pass `stream.requested_width/height` for the encode target. `client.display_width/height` are used at `session/prepare` to clamp upscale: if the client requests more than its panel size, Hermes stores `min(requested, client display)` for the next launch. Host-native caps for physical tiles are still a follow-up (`resolve_session_render_size`).
 
 ### Practical defaults on kossin
 
@@ -161,6 +163,6 @@ Use `POST /api/hestia/session/prepare` before launch. Pass `stream.requested_wid
 | Two clients at once | Keep one 4K + one 1080p, not two 4K HEVC on Renoir |
 | Client wants 4K, host is 1080p | Cap at 1080p native; do not upscale unless explicitly needed |
 
-### Future code (fork)
+### Follow-up (fork)
 
-Single helper `resolve_session_render_size()` shared by virtual prepare and physical launch: query connector native mode, clamp requested, optionally trigger `configure_display()` for physical tiles when `dd.resolution_option = automatic`.
+`resolve_session_render_size()` for physical tiles: query connector native mode and optionally trigger `configure_display()` when `dd.resolution_option = automatic`.

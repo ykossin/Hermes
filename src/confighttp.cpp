@@ -1628,6 +1628,43 @@ namespace confighttp {
     return value.is_string() && values.contains(value.get<std::string>());
   }
 
+
+  struct hestia_stream_resolution_t {
+    int width;
+    int height;
+  };
+
+  hestia_stream_resolution_t clamp_hestia_stream_resolution(
+    int requested_width,
+    int requested_height,
+    int client_display_width,
+    int client_display_height
+  ) {
+    int width = requested_width;
+    int height = requested_height;
+
+    if (client_display_width > 0 && width > client_display_width) {
+      BOOST_LOG(warning) << "[HestiaAPI] Requested width " << width
+                         << " exceeds client display " << client_display_width << "; clamping";
+      width = client_display_width;
+    }
+    if (client_display_height > 0 && height > client_display_height) {
+      BOOST_LOG(warning) << "[HestiaAPI] Requested height " << height
+                         << " exceeds client display " << client_display_height << "; clamping";
+      height = client_display_height;
+    }
+
+    width &= ~1;
+    height &= ~1;
+    if (width < 640) {
+      width = 640;
+    }
+    if (height < 480) {
+      height = 480;
+    }
+    return {width, height};
+  }
+
   bool validate_hestia_session_prepare(const nlohmann::json &request, std::string &error) {
     static const std::set<std::string> request_keys {
       "client", "stream", "virtual_display", "app",
@@ -1737,17 +1774,24 @@ namespace confighttp {
       }
 #endif
       const auto client = std::static_pointer_cast<crypto::named_cert_t>(request->userp);
+      const auto &client_info = input["client"];
+      const auto resolved = clamp_hestia_stream_resolution(
+        stream["requested_width"].get<int>(),
+        stream["requested_height"].get<int>(),
+        client_info["display_width"].get<int>(),
+        client_info["display_height"].get<int>()
+      );
       nvhttp::store_hestia_session_prepare(client->uuid, {
         .virtual_display = virtual_display["enabled"].get<bool>(),
-        .width = stream["requested_width"].get<int>(),
-        .height = stream["requested_height"].get<int>(),
+        .width = resolved.width,
+        .height = resolved.height,
         .fps = stream["requested_fps"].get<int>(),
         .hdr = stream["hdr_mode"] == "hdr",
         .scale_factor = stream["scale_factor"].get<uint32_t>(),
         .launch_mode = app["launch_mode"].get<std::string>(),
       });
-      BOOST_LOG(debug) << "[HestiaAPI] session prepare requested: width=" << stream["requested_width"]
-                       << " height=" << stream["requested_height"] << " fps=" << stream["requested_fps"]
+      BOOST_LOG(debug) << "[HestiaAPI] session prepare requested: width=" << resolved.width
+                       << " height=" << resolved.height << " fps=" << stream["requested_fps"]
                        << " virtual_display=" << virtual_display["enabled"]
                        << " launch_mode=" << app["launch_mode"];
 

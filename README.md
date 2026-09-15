@@ -425,3 +425,4 @@ Report issues for the host at
 three things a report needs to be actionable: the Hermes version, one
 copy-paste block of host information, and a debug-level log. See
 [.github/CONTRIBUTING.md](.github/CONTRIBUTING.md) for what each form is for.
+Dual-KMS + Hestia deployment guide: [docs/dual-kms-hestia-setup.md](docs/dual-kms-hestia-setup.md) (EN), [docs/dual-kms-hestia-setup.ru.md](docs/dual-kms-hestia-setup.ru.md) (RU).

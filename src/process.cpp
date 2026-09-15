@@ -823,6 +823,20 @@ namespace proc {
 #endif
   }
 
+
+namespace {
+  void normalize_session_render_size(uint32_t &width, uint32_t &height) {
+    if (width == 0) {
+      width = 1920;
+    }
+    if (height == 0) {
+      height = 1080;
+    }
+    width = std::min(width, 7680u) & ~1u;
+    height = std::min(height, 4320u) & ~1u;
+  }
+}  // namespace
+
   int proc_t::prepare_session_virtual_display(
     std::shared_ptr<rtsp_stream::launch_session_t> launch_session,
     bool apply_scale,
@@ -856,6 +870,7 @@ namespace proc {
         render_width = static_cast<uint32_t>(render_width * (static_cast<float>(scale_factor) / 100.0f)) & ~1U;
         render_height = static_cast<uint32_t>(render_height * (static_cast<float>(scale_factor) / 100.0f)) & ~1U;
       }
+      normalize_session_render_size(render_width, render_height);
       launch_session->width = render_width;
       launch_session->height = render_height;
     }
