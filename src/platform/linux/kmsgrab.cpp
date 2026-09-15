@@ -1198,9 +1198,9 @@ namespace platf {
           }
 
           if (!connector_name.empty()) {
-            BOOST_LOG(debug) << "Connector ["sv << connector_name << "] not on ["sv << filestring << '];
+            BOOST_LOG(debug) << "Connector ["sv << connector_name << "] not on ["sv << filestring << ']'
           } else {
-            BOOST_LOG(debug) << "Monitor ["sv << monitor_index << "] not on ["sv << filestring << '];
+            BOOST_LOG(debug) << "Monitor ["sv << monitor_index << "] not on ["sv << filestring << ']'
           }
         }
 
