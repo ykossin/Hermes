@@ -72,6 +72,20 @@ Merge `csrf_allowed_origins` and `sunshine_name` with your LAN hostname locally;
 
 Copy [headless-desktop.sh](../examples/dual-kms-hestia/headless-desktop.sh) to `~/.local/bin/`, chmod +x, and enable [headless-desktop.service](../examples/dual-kms-hestia/headless-desktop.service) under `~/.config/systemd/user/`.
 
+
+## Rebuild on Arch
+
+If `makepkg` fails on missing `third-party/tray`, restore the submodule before build:
+
+```bash
+git submodule update --init third-party/tray
+# or copy from a full clone:
+cp -a ../_deprecated-Hermes/third-party/tray third-party/
+makepkg -f --noconfirm
+sudo pacman -U hermes-streaming-*-x86_64.pkg.tar.zst
+systemctl --user restart hermes.service
+```
+
 ## Forks
 
 | Repo | Role |

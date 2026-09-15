@@ -1932,6 +1932,11 @@ namespace proc {
     launch_session->height = render_height;
 
     this->initial_display = config::video.output_name;
+    const auto update_global_output_name = [](const std::string &name) {
+      if (!config::video.hermes_kms_multi_output || rtsp_stream::session_count() == 0) {
+        config::video.output_name = name;
+      }
+    };
     // Executed when returning from function
     auto fg = util::fail_guard([&]() {
 #ifndef _WIN32
@@ -1981,15 +1986,13 @@ namespace proc {
         wanted = config::drm_connector_connected(probe) ? probe : fallback;
       } else if (wanted.empty()) {
         wanted = config::video.output_name;
-      } else if (wanted == probe && !config::drm_connector_connected(probe)) {
-        BOOST_LOG(warning) << "Physical connector " << probe
+      } else if (!config::drm_connector_connected(wanted)) {
+        BOOST_LOG(warning) << "Capture connector " << wanted
                            << " is disconnected; falling back to " << fallback;
         wanted = fallback;
       }
       launch_session->display_name = wanted;
-      if (!config::video.hermes_kms_multi_output || rtsp_stream::session_count() == 0) {
-        config::video.output_name = wanted;
-      }
+      update_global_output_name(wanted);
       BOOST_LOG(info) << "App [" << _app.name << "] captures existing display [" << wanted << "]";
     }
 
@@ -2034,7 +2037,10 @@ namespace proc {
       session_scoped_display_prepared = true;
       this->virtual_display = true;
       this->display_name = launch_session->display_name;
-      config::video.output_name = display_device::map_display_name(this->display_name);
+      {
+        auto mapped = display_device::map_display_name(this->display_name);
+        update_global_output_name(mapped.empty() ? this->display_name : mapped);
+      }
     }
 #endif
 
@@ -2224,7 +2230,7 @@ namespace proc {
             // look up an empty display and fail, so keep the virtual display's
             // own name in that case (e.g. HERMES-1).
             auto mapped_name = display_device::map_display_name(this->display_name);
-            config::video.output_name = mapped_name.empty() ? this->display_name : std::move(mapped_name);
+            update_global_output_name(mapped_name.empty() ? this->display_name : std::move(mapped_name));
           }
         } else {
           BOOST_LOG(warning) << "Virtual Display creation failed, or cannot get created display name in time!";

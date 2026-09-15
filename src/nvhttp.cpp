@@ -1076,6 +1076,8 @@ namespace nvhttp {
       if (config::input.enable_input_only_mode && current_appid != proc::input_only_app_id) {
         current_appid = 0;
       }
+      // Moonlight needs SUNSHINE_SERVER_FREE to launch a second tile while another
+      // stream is active; per-session capture uses launch_session->display_name instead.
       if (config::video.hermes_kms_multi_output) {
         current_appid = 0;
       }
