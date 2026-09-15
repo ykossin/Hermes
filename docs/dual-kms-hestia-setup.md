@@ -42,24 +42,44 @@ Adjust connector names (`DP-1`, `Virtual-1`, …) to match `drm-info` on your ho
 
 ## Build and install (Arch)
 
+### 1. Hermes-KMS kernel module
+
+```bash
+git clone https://github.com/ykossin/Hermes-KMS.git
+cd Hermes-KMS
+makepkg -si
+sudo modprobe hermes_kms initial_enabled=0 outputs=2
+```
+
+Install `hermes-kmsctl` to `~/.local/bin` from the package build or `tools/hermes-kmsctl` in the same repo.
+
+Upstream driver: [MrOz59/Hermes-KMS](https://github.com/MrOz59/Hermes-KMS). Fork [ykossin/Hermes-KMS](https://github.com/ykossin/Hermes-KMS) tracks it without host-specific changes.
+
+### 2. Hermes streaming host
+
 ```bash
 git clone https://github.com/ykossin/Hermes.git
 cd Hermes
 makepkg -si
+cp examples/dual-kms-hestia/hermes.conf ~/.config/hermes/hermes.conf
+cp examples/dual-kms-hestia/apps.json ~/.config/hermes/apps.json
 systemctl --user enable --now hermes.service
 ```
 
-Optional headless baseline (example user unit):
+Merge `csrf_allowed_origins` and `sunshine_name` with your LAN hostname locally; do not commit those values.
 
-```bash
-hermes-kmsctl hold 3840x2160@60
-```
+### 3. Headless baseline (optional)
 
-Run that from a user `@reboot` script or a small systemd user service on your machine.
+Copy [headless-desktop.sh](../examples/dual-kms-hestia/headless-desktop.sh) to `~/.local/bin/`, chmod +x, and enable [headless-desktop.service](../examples/dual-kms-hestia/headless-desktop.service) under `~/.config/systemd/user/`.
 
-## Upstream
+## Forks
 
-[MrOz59/Hermes](https://github.com/MrOz59/Hermes). This fork adds dual-output patches with config-driven connector names on `main`.
+| Repo | Role |
+|------|------|
+| [ykossin/Hermes](https://github.com/ykossin/Hermes) | Dual-output Hermes, config-driven connectors |
+| [ykossin/Hermes-KMS](https://github.com/ykossin/Hermes-KMS) | DRM virtual display module (mirror of upstream) |
+
+Upstream: [MrOz59/Hermes](https://github.com/MrOz59/Hermes), [MrOz59/Hermes-KMS](https://github.com/MrOz59/Hermes-KMS).
 
 ## Notes
 
