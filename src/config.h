@@ -324,6 +324,8 @@ namespace config {
   bool list_contains_connector(const std::vector<std::string> &list, const std::string &name);
   bool is_config_virtual_connector(const std::string &name);
   bool is_config_left_virtual_connector(const std::string &name);
+  std::string drm_connector_from_sysfs_entry(const std::string &entry_name);
+  bool drm_connector_connected(const std::string &connector);
 
   int parse(int argc, char *argv[]);
   std::unordered_map<std::string, std::string> parse_config(const std::string_view &file_content);

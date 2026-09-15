@@ -1496,6 +1496,36 @@ namespace config {
     return list_contains_connector(video.hermes_kms_left_connectors, name);
   }
 
+  std::string drm_connector_from_sysfs_entry(const std::string &entry_name) {
+    if (entry_name.size() < 6 || entry_name.compare(0, 4, "card") != 0) {
+      return {};
+    }
+    const auto dash = entry_name.find(-, 4);
+    if (dash == std::string::npos || dash + 1 >= entry_name.size()) {
+      return {};
+    }
+    return entry_name.substr(dash + 1);
+  }
+
+  bool drm_connector_connected(const std::string &connector) {
+    if (connector.empty()) {
+      return false;
+    }
+    std::error_code fs_ec;
+    for (const auto &entry : std::filesystem::directory_iterator("/sys/class/drm", fs_ec)) {
+      if (drm_connector_from_sysfs_entry(entry.path().filename().string()) != connector) {
+        continue;
+      }
+      std::ifstream status {entry.path() / "status"};
+      std::string value;
+      if (status >> value && value == "connected") {
+        return true;
+      }
+    }
+    return false;
+  }
+
+
   int parse(int argc, char *argv[]) {
     std::unordered_map<std::string, std::string> cmd_vars;
 #ifdef _WIN32

@@ -1974,36 +1974,23 @@ namespace proc {
 
     if (!_app.virtual_display) {
       launch_session->virtual_display = false;
-      auto drm_connector_connected = [](const std::string &connector) {
-        std::error_code fs_ec;
-        for (auto const &entry : std::filesystem::directory_iterator("/sys/class/drm", fs_ec)) {
-          const auto name = entry.path().filename().string();
-          if (name.find(connector) == std::string::npos) {
-            continue;
-          }
-          std::ifstream status {entry.path() / "status"};
-          std::string value;
-          if (status >> value && value == "connected") {
-            return true;
-          }
-        }
-        return false;
-      };
-      if (config::video.output_name.empty()) {
-        const auto &probe = config::video.physical_capture_probe_connector;
-        const auto &fallback = config::video.physical_capture_fallback_connector;
-        std::string wanted = _app.capture_display;
-        if (wanted.empty()) {
-          wanted = drm_connector_connected(probe) ? probe : fallback;
-        } else if (wanted == probe && !drm_connector_connected(probe)) {
-          BOOST_LOG(warning) << "Physical connector " << probe
-                             << " is disconnected; falling back to " << fallback;
-          wanted = fallback;
-        }
+      const auto &probe = config::video.physical_capture_probe_connector;
+      const auto &fallback = config::video.physical_capture_fallback_connector;
+      std::string wanted = _app.capture_display;
+      if (wanted.empty() && config::video.output_name.empty()) {
+        wanted = config::drm_connector_connected(probe) ? probe : fallback;
+      } else if (wanted.empty()) {
+        wanted = config::video.output_name;
+      } else if (wanted == probe && !config::drm_connector_connected(probe)) {
+        BOOST_LOG(warning) << "Physical connector " << probe
+                           << " is disconnected; falling back to " << fallback;
+        wanted = fallback;
+      }
+      launch_session->display_name = wanted;
+      if (!config::video.hermes_kms_multi_output || rtsp_stream::session_count() == 0) {
         config::video.output_name = wanted;
       }
-      BOOST_LOG(info) << "App [" << _app.name << "] captures existing display ["
-                      << config::video.output_name << "]";
+      BOOST_LOG(info) << "App [" << _app.name << "] captures existing display [" << wanted << "]";
     }
 
     const bool needs_virtual_display =

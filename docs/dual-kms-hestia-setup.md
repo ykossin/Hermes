@@ -21,7 +21,7 @@ Key options:
 
 - `virtual_display_backend = hermes_kms`
 - `hermes_kms_multi_output = true` — two clients without killing the first session
-- `isolated_virtual_display_option = true`
+- `isolated_virtual_display_option = false` for shared multi-output (default here)
 - `capture = kms`
 - Connector layout and physical capture fallbacks are configurable (no hardcoded names in code)
 
@@ -80,6 +80,31 @@ Copy [headless-desktop.sh](../examples/dual-kms-hestia/headless-desktop.sh) to `
 | [ykossin/Hermes-KMS](https://github.com/ykossin/Hermes-KMS) | DRM virtual display module (mirror of upstream) |
 
 Upstream: [MrOz59/Hermes](https://github.com/MrOz59/Hermes), [MrOz59/Hermes-KMS](https://github.com/MrOz59/Hermes-KMS).
+
+
+## Post-install verification
+
+After installing or upgrading Hermes-KMS:
+
+```bash
+hermes-kmsctl version    # uapi_version must be >= 11 (13 with current driver)
+hermes-kmsctl caps       # output_count=2 for dual Hestia
+lsmod | grep hermes_kms
+getfacl /dev/dri/renderD128   # active desktop user needs rw after login
+```
+
+Install udev rule `72-hermes-kms-render-access.rules` from the Hermes-KMS repo. Without render-node access Hermes logs `Permission denied` on renderD128 and Hermes-KMS virtual sessions stay disabled.
+
+Modprobe for **shared multi-output** (this guide):
+
+```bash
+# /etc/modprobe.d/hermes-kms.conf
+options hermes_kms initial_enabled=0 outputs=2 hotplug_events=Y
+```
+
+Do not mix this with `hermes-kms-setup configure --session-devices N` unless you switch to isolated session cards (`hermes_kms_isolated_sessions = true`).
+
+Hermes must run inside the Plasma session (`systemctl --user restart hermes.service` after graphical login). After kernel upgrades rebuild the DKMS package and reboot.
 
 ## Notes
 
