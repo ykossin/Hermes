@@ -121,6 +121,8 @@ Hermes должен работать внутри Plasma session. После о�
 3. При двух клиентах смотри layout races в `hermes.log`.
 4. Fallback на software encoder, если VAAPI недоступен.
 5. `physical_capture_probe_connector` настрой под свой кабель.
+
+На Renoir физическая панель в sysfs может быть `card2-DP-1`, в apps.json по-прежнему `DP-1`.
 6. Перед major upgrade: rebase на MrOz59/main и unit tests.
 
 ## Разрешение и автоскейл

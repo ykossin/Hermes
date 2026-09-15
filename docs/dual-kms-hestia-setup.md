@@ -40,7 +40,10 @@ See [examples/dual-kms-hestia/apps.json](../examples/dual-kms-hestia/apps.json).
 | Monitor 1 / 2 | Session-scoped virtual outputs |
 | Cursor IDE | Launches on virtual display |
 
-Adjust connector names (`DP-1`, `Virtual-1`, …) to match `drm-info` on your host.
+Adjust connector names
+
+On Renoir hosts the physical panel may show up as `card2-DP-1` in sysfs while apps still use the connector name `DP-1`.
+ (`DP-1`, `Virtual-1`, …) to match `drm-info` on your host.
 
 ## Build and install (Arch)
 

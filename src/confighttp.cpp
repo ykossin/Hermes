@@ -1643,12 +1643,13 @@ namespace confighttp {
     int width = requested_width;
     int height = requested_height;
 
-    if (client_display_width > 0 && width > client_display_width) {
+    constexpr int min_trusted_client_display = 1280;
+    if (client_display_width >= min_trusted_client_display && width > client_display_width) {
       BOOST_LOG(warning) << "[HestiaAPI] Requested width " << width
                          << " exceeds client display " << client_display_width << "; clamping";
       width = client_display_width;
     }
-    if (client_display_height > 0 && height > client_display_height) {
+    if (client_display_height >= min_trusted_client_display && height > client_display_height) {
       BOOST_LOG(warning) << "[HestiaAPI] Requested height " << height
                          << " exceeds client display " << client_display_height << "; clamping";
       height = client_display_height;

@@ -1029,7 +1029,7 @@ namespace platf {
             connector_name.rfind("Virtual-", 0) == 0 ||
             connector_name.rfind("HERMES-", 0) == 0 ||
             connector_name.rfind("VIRTUAL-", 0) == 0;
-          if (virtual_card.empty() && card.is_hermes_kms() && !want_hermes_connector) {
+          if (virtual_card.empty() && card.is_hermes_kms() && connector_name.empty()) {
             continue;
           }
 
@@ -1199,6 +1199,12 @@ namespace platf {
 
             this->card = std::move(card);
             goto break_loop;
+          }
+
+          if (!connector_name.empty()) {
+            BOOST_LOG(debug) << "Connector ["sv << connector_name << "] not on ["sv << filestring << '];
+          } else {
+            BOOST_LOG(debug) << "Monitor ["sv << monitor_index << "] not on ["sv << filestring << '];
           }
         }
 
