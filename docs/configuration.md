@@ -1587,6 +1587,74 @@ editing the `conf` file in a text editor. Use the examples as reference.
     </tr>
 </table>
 
+### hermes_kms_left_connectors / hermes_kms_right_connectors
+
+<table>
+    <tr>
+        <td>Description</td>
+        <td colspan="2">
+            When <code>hermes_kms_multi_output</code> is enabled, virtual connectors in the left list are placed to the left of physical outputs; others go to the right. Replaces hardcoded Virtual-1/Virtual-2 names.
+        </td>
+    </tr>
+    <tr>
+        <td>Default</td>
+        <td colspan="2">@code{}
+            hermes_kms_left_connectors = [Virtual-1, HERMES-1]
+            hermes_kms_right_connectors = [Virtual-2, HERMES-2]
+            @endcode</td>
+    </tr>
+</table>
+
+### virtual_connector_prefixes
+
+<table>
+    <tr>
+        <td>Description</td>
+        <td colspan="2">
+            Name prefixes treated as virtual connectors when computing physical monitor bounds (KScreen layout).
+        </td>
+    </tr>
+    <tr>
+        <td>Default</td>
+        <td colspan="2">@code{}
+            virtual_connector_prefixes = [Virtual-, HERMES-]
+            @endcode</td>
+    </tr>
+</table>
+
+### hermes_kms_default_virtual_width
+
+<table>
+    <tr>
+        <td>Description</td>
+        <td colspan="2">Fallback width (pixels) when placing a virtual output if KScreen has not reported its size yet.</td>
+    </tr>
+    <tr>
+        <td>Default</td>
+        <td colspan="2">3840</td>
+    </tr>
+</table>
+
+### physical_capture_probe_connector / physical_capture_fallback_connector
+
+<table>
+    <tr>
+        <td>Description</td>
+        <td colspan="2">
+            For apps with <code>virtual-display = false</code> and empty <code>capture-display</code>, Hermes probes the first connector via sysfs and falls back to the second if disconnected.
+        </td>
+    </tr>
+    <tr>
+        <td>Default</td>
+        <td colspan="2">@code{}
+            physical_capture_probe_connector = DP-1
+            physical_capture_fallback_connector = Virtual-1
+            @endcode</td>
+    </tr>
+</table>
+
+See also [dual-kms-hestia-setup.md](dual-kms-hestia-setup.md) for a full dual-client example.
+
 ### fallback_mode
 
 <table>

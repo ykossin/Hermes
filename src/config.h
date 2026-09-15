@@ -95,6 +95,12 @@ namespace config {
     bool hermes_kms_isolated_sessions;
     std::string gamescope_backend;
     std::string hermes_kms_session_compositor;
+    std::vector<std::string> hermes_kms_left_connectors;
+    std::vector<std::string> hermes_kms_right_connectors;
+    std::vector<std::string> virtual_connector_prefixes;
+    int hermes_kms_default_virtual_width;
+    std::string physical_capture_probe_connector;
+    std::string physical_capture_fallback_connector;
 
     struct dd_t {
       struct workarounds_t {
@@ -314,6 +320,10 @@ namespace config {
   extern nvhttp_t nvhttp;
   extern input_t input;
   extern sunshine_t sunshine;
+
+  bool list_contains_connector(const std::vector<std::string> &list, const std::string &name);
+  bool is_config_virtual_connector(const std::string &name);
+  bool is_config_left_virtual_connector(const std::string &name);
 
   int parse(int argc, char *argv[]);
   std::unordered_map<std::string, std::string> parse_config(const std::string_view &file_content);

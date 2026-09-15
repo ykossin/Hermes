@@ -110,6 +110,8 @@ build() {
       -DCMAKE_BUILD_TYPE=Release \
       -DBUILD_TESTS=OFF \
       -DCMAKE_INSTALL_PREFIX=/usr \
+      -DSUNSHINE_ENABLE_CUDA=OFF \
+      -DCUDA_FAIL_ON_MISSING=OFF \
       -DSUNSHINE_EXECUTABLE_PATH=/usr/bin/hermes \
       -DSUNSHINE_ASSETS_DIR=share/hermes
     cmake --build build

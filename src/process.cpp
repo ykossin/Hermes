@@ -1884,12 +1884,19 @@ namespace proc {
   }
 
   int proc_t::execute(const ctx_t& app, std::shared_ptr<rtsp_stream::launch_session_t> launch_session) {
-    if (_app_id == input_only_app_id) {
-      terminate(false, false);
-      std::this_thread::sleep_for(1s);
+    const bool keep_existing_sessions =
+      config::video.hermes_kms_multi_output &&
+      rtsp_stream::session_count() > 0;
+    if (!keep_existing_sessions) {
+      if (_app_id == input_only_app_id) {
+        terminate(false, false);
+        std::this_thread::sleep_for(1s);
+      } else {
+        terminate(false, false);
+      }
     } else {
-      // Ensure starting from a clean slate
-      terminate(false, false);
+      BOOST_LOG(info) << "Keeping existing sessions; launching additional virtual-display app ["
+                      << app.name << "] (hermes_kms_multi_output)";
     }
 
     _app = app;
@@ -1963,6 +1970,40 @@ namespace proc {
       BOOST_LOG(info) << "Gamescope session detected; capturing the Gamescope output directly "
                          "instead of creating a virtual display.";
       launch_session->virtual_display = false;
+    }
+
+    if (!_app.virtual_display) {
+      launch_session->virtual_display = false;
+      auto drm_connector_connected = [](const std::string &connector) {
+        std::error_code fs_ec;
+        for (auto const &entry : std::filesystem::directory_iterator("/sys/class/drm", fs_ec)) {
+          const auto name = entry.path().filename().string();
+          if (name.find(connector) == std::string::npos) {
+            continue;
+          }
+          std::ifstream status {entry.path() / "status"};
+          std::string value;
+          if (status >> value && value == "connected") {
+            return true;
+          }
+        }
+        return false;
+      };
+      if (config::video.output_name.empty()) {
+        const auto &probe = config::video.physical_capture_probe_connector;
+        const auto &fallback = config::video.physical_capture_fallback_connector;
+        std::string wanted = _app.capture_display;
+        if (wanted.empty()) {
+          wanted = drm_connector_connected(probe) ? probe : fallback;
+        } else if (wanted == probe && !drm_connector_connected(probe)) {
+          BOOST_LOG(warning) << "Physical connector " << probe
+                             << " is disconnected; falling back to " << fallback;
+          wanted = fallback;
+        }
+        config::video.output_name = wanted;
+      }
+      BOOST_LOG(info) << "App [" << _app.name << "] captures existing display ["
+                      << config::video.output_name << "]";
     }
 
     const bool needs_virtual_display =
@@ -3352,6 +3393,7 @@ namespace proc {
           ctx.wait_all = app_node.value("wait-all", true);
           ctx.exit_timeout = std::chrono::seconds { app_node.value("exit-timeout", 5) };
           ctx.virtual_display = app_node.value("virtual-display", false);
+          ctx.capture_display = parse_env_val(this_env, app_node.value("capture-display", ""));
           ctx.scale_factor = app_node.value("scale-factor", 100);
           ctx.use_app_identity = app_node.value("use-app-identity", false);
           ctx.per_client_app_identity = app_node.value("per-client-app-identity", false);

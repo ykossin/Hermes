@@ -94,6 +94,7 @@ namespace proc {
     bool wait_all;
     bool virtual_display;
     bool virtual_display_primary;
+    std::string capture_display;
     bool use_app_identity;
     bool per_client_app_identity;
     bool allow_client_commands;

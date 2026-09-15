@@ -1076,9 +1076,13 @@ namespace nvhttp {
       if (config::input.enable_input_only_mode && current_appid != proc::input_only_app_id) {
         current_appid = 0;
       }
+      if (config::video.hermes_kms_multi_output) {
+        current_appid = 0;
+      }
       tree.put("root.currentgame", current_appid);
       tree.put(
         "root.currentgameuuid",
+        current_appid == 0 ? "" :
         isolated_sessions ?
           proc::proc.running_app_uuid_for_client(named_cert_p->uuid) :
           proc::proc.get_running_app_uuid()
@@ -1334,6 +1338,7 @@ namespace nvhttp {
 
       if (
         !isolated_sessions
+        && !config::video.hermes_kms_multi_output
         && current_appid > 0
         && current_appid != proc::input_only_app_id
         && (
@@ -1498,7 +1503,7 @@ namespace nvhttp {
         !isolated_sessions &&
         config::video.virtual_display_backend == "hermes_kms" &&
         config::video.hermes_kms_multi_output &&
-        (proc::proc.virtual_display || launch_session->virtual_display || config::video.headless_mode) &&
+        (launch_session->virtual_display || config::video.headless_mode) &&
         !launch_session->session_scoped_virtual_display) {
       if (const int result = proc::proc.prepare_session_virtual_display(launch_session); result != 0) {
         tree.put("root.<xmlattr>.status_code", result);

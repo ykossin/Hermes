@@ -503,6 +503,12 @@ namespace config {
     false,  // hermes_kms_isolated_sessions
     "auto"s,  // gamescope_backend
     "weston"s,  // hermes_kms_session_compositor
+    {std::string {"Virtual-1"}, std::string {"HERMES-1"}},  // hermes_kms_left_connectors
+    {std::string {"Virtual-2"}, std::string {"HERMES-2"}},  // hermes_kms_right_connectors
+    {std::string {"Virtual-"}, std::string {"HERMES-"}},  // virtual_connector_prefixes
+    3840,  // hermes_kms_default_virtual_width
+    "DP-1"s,  // physical_capture_probe_connector
+    "Virtual-1"s,  // physical_capture_fallback_connector
 
     {
       video_t::dd_t::config_option_e::disabled,  // configuration_option
@@ -1254,6 +1260,12 @@ namespace config {
     // Deliberately unrestricted: weston is the profile Hermes ships and tests,
     // and any other name is a profile the administrator dropped in themselves.
     string_f(vars, "hermes_kms_session_compositor", video.hermes_kms_session_compositor);
+    list_string_f(vars, "hermes_kms_left_connectors", video.hermes_kms_left_connectors);
+    list_string_f(vars, "hermes_kms_right_connectors", video.hermes_kms_right_connectors);
+    list_string_f(vars, "virtual_connector_prefixes", video.virtual_connector_prefixes);
+    int_between_f(vars, "hermes_kms_default_virtual_width", video.hermes_kms_default_virtual_width, {640, 16384});
+    string_f(vars, "physical_capture_probe_connector", video.physical_capture_probe_connector);
+    string_f(vars, "physical_capture_fallback_connector", video.physical_capture_fallback_connector);
 
     generic_f(vars, "dd_configuration_option", video.dd.configuration_option, dd::config_option_from_view);
     generic_f(vars, "dd_resolution_option", video.dd.resolution_option, dd::resolution_option_from_view);
@@ -1461,6 +1473,27 @@ namespace config {
 
     ::video::active_hevc_mode = video.hevc_mode;
     ::video::active_av1_mode = video.av1_mode;
+  }
+
+  bool list_contains_connector(const std::vector<std::string> &list, const std::string &name) {
+    return std::find(list.begin(), list.end(), name) != list.end();
+  }
+
+  bool is_config_virtual_connector(const std::string &name) {
+    if (list_contains_connector(video.hermes_kms_left_connectors, name) ||
+        list_contains_connector(video.hermes_kms_right_connectors, name)) {
+      return true;
+    }
+    for (const auto &prefix : video.virtual_connector_prefixes) {
+      if (!prefix.empty() && name.rfind(prefix, 0) == 0) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  bool is_config_left_virtual_connector(const std::string &name) {
+    return list_contains_connector(video.hermes_kms_left_connectors, name);
   }
 
   int parse(int argc, char *argv[]) {

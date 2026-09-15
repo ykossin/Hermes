@@ -2103,6 +2103,44 @@ namespace VDISPLAY {
     const std::vector<kscreen_output_t> &current,
     virtual_display_layout_e layout
   ) {
+    if (layout == virtual_display_layout_e::extend && config::video.hermes_kms_multi_output) {
+      int physical_min_x = 0;
+      int physical_max_right = 0;
+      int virtual_w = 0;
+      int target_y = 0;
+      bool have_physical = false;
+
+      for (const auto &output : current) {
+        if (output.name == virtual_output) {
+          virtual_w = output.width;
+          continue;
+        }
+        if (!output.connected || !output.enabled || config::is_config_virtual_connector(output.name)) {
+          continue;
+        }
+        if (!have_physical) {
+          physical_min_x = output.x;
+          physical_max_right = output.x + output.width;
+          target_y = output.y;
+          have_physical = true;
+        } else {
+          physical_min_x = std::min(physical_min_x, output.x);
+          physical_max_right = std::max(physical_max_right, output.x + output.width);
+          target_y = std::min(target_y, output.y);
+        }
+      }
+
+      if (virtual_w <= 0) {
+        virtual_w = config::video.hermes_kms_default_virtual_width;
+      }
+
+      const bool place_left = config::is_config_left_virtual_connector(virtual_output);
+      return {
+        place_left ? physical_min_x - virtual_w : physical_max_right,
+        target_y
+      };
+    }
+
     std::set<std::string> present;
     for (const auto &output : current) {
       if (output.connected) {

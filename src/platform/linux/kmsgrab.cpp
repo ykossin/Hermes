@@ -763,6 +763,11 @@ namespace platf {
         return ver && ver->name && strncmp(ver->name, "nvidia-drm", 10) == 0;
       }
 
+      bool is_hermes_kms() const {
+        version_t ver {drmGetVersion(fd.el)};
+        return ver && ver->name && std::string_view {ver->name} == "hermes-kms"sv;
+      }
+
       bool is_cursor(std::uint32_t plane_id) {
         auto props = plane_props(plane_id);
         for (auto &[prop, val] : props) {
@@ -972,6 +977,7 @@ namespace platf {
         // card so we never silently capture the user's primary monitor.
         int monitor_index = 0;
         std::string virtual_card;
+        std::string connector_name;
         constexpr std::string_view virtual_card_prefix {"VIRTUAL-card"};
         const auto hermes_card_index = VDISPLAY::getHermesKmsCardIndex(display_name);
         const auto evdi_card_index = VDISPLAY::getEvdiCardIndex(display_name);
@@ -986,10 +992,17 @@ namespace platf {
             return -1;
           }
           virtual_card = "card" + card_index;
-        } else if (display_name.rfind("VIRTUAL-", 0) != 0) {
-          // Not a virtual display, parse as numeric index
-          monitor_index = util::from_view(display_name);
-        } else {
+        } else if (display_name.rfind("VIRTUAL-", 0) != 0 &&
+                   display_name.rfind("HERMES-", 0) != 0) {
+          const bool numeric = !display_name.empty() &&
+            display_name.find_first_not_of("0123456789") == std::string::npos;
+          if (numeric) {
+            monitor_index = util::from_view(display_name);
+          } else {
+            connector_name = display_name;
+          }
+        } else if (display_name.rfind("VIRTUAL-", 0) == 0 ||
+                   display_name.rfind("HERMES-", 0) == 0) {
           BOOST_LOG(error) << "Virtual display ["sv << display_name << "] has no DRM card mapping"sv;
           return -1;
         }
@@ -1012,6 +1025,17 @@ namespace platf {
             continue;
           }
 
+          const bool want_hermes_connector =
+            connector_name.rfind("Virtual-", 0) == 0 ||
+            connector_name.rfind("HERMES-", 0) == 0 ||
+            connector_name.rfind("VIRTUAL-", 0) == 0;
+          if (virtual_card.empty() && card.is_hermes_kms() && !want_hermes_connector) {
+            continue;
+          }
+
+          kms::conn_type_count_t conn_type_count;
+          auto card_connectors = card.monitors(conn_type_count);
+
           // Skip non-Nvidia cards if we're looking for CUDA devices
           // unless NVENC is selected manually by the user
           if (virtual_card.empty() && mem_type == mem_type_e::cuda && !card.is_nvidia()) {
@@ -1032,7 +1056,27 @@ namespace platf {
               continue;
             }
 
-            if (monitor != monitor_index) {
+            if (!connector_name.empty()) {
+              bool matched = false;
+              const auto dash = connector_name.find_last_of('-');
+              const auto want_type = dash == std::string::npos ?
+                                       kms::from_view(connector_name) :
+                                       kms::from_view(connector_name.substr(0, dash));
+              const auto want_index = dash == std::string::npos ?
+                                        1u :
+                                        static_cast<std::uint32_t>(std::max<int64_t>(1, util::from_view(connector_name.substr(dash + 1))));
+              for (auto &connector : card_connectors) {
+                if (connector.crtc_id == plane->crtc_id &&
+                    connector.type == want_type &&
+                    connector.index == want_index) {
+                  matched = true;
+                  break;
+                }
+              }
+              if (!matched) {
+                continue;
+              }
+            } else if (monitor != monitor_index) {
               ++monitor;
               continue;
             }
@@ -1158,7 +1202,11 @@ namespace platf {
           }
         }
 
-        BOOST_LOG(error) << "Couldn't find monitor ["sv << monitor_index << ']';
+        if (!connector_name.empty()) {
+          BOOST_LOG(error) << "Couldn't find connector ["sv << connector_name << ']';
+        } else {
+          BOOST_LOG(error) << "Couldn't find monitor ["sv << monitor_index << ']';
+        }
         return -1;
 
       // Neatly break from nested for loop
@@ -3046,7 +3094,17 @@ namespace platf {
 
         kms::print(plane.get(), fb.get(), crtc.get());
 
-        display_names.emplace_back(std::to_string(count++));
+        display_names.emplace_back(std::to_string(count));
+        if (it != std::end(crtc_to_monitor)) {
+          const char *type_name = drmModeGetConnectorTypeName(it->second.type);
+          if (type_name && type_name[0]) {
+            auto drm_connector_name = std::string {type_name} + "-" + std::to_string(it->second.index);
+            if (std::find(display_names.begin(), display_names.end(), drm_connector_name) == display_names.end()) {
+              display_names.emplace_back(std::move(drm_connector_name));
+            }
+          }
+        }
+        ++count;
       }
 
       cds.emplace_back(kms::card_descriptor_t {
