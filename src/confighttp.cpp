@@ -1666,6 +1666,44 @@ namespace confighttp {
     return {width, height};
   }
 
+  hestia_stream_resolution_t resolve_session_render_size(
+    int requested_width,
+    int requested_height,
+    int client_display_width,
+    int client_display_height,
+    const std::string &capture_connector,
+    bool virtual_display
+  ) {
+    auto resolved = clamp_hestia_stream_resolution(
+      requested_width,
+      requested_height,
+      client_display_width,
+      client_display_height
+    );
+
+    if (virtual_display || capture_connector.empty()) {
+      return resolved;
+    }
+
+    if (const auto native = display_device::active_connector_resolution(capture_connector)) {
+      if (resolved.width > native->width) {
+        BOOST_LOG(warning) << "[HestiaAPI] Requested width " << resolved.width
+                           << " exceeds connector " << capture_connector
+                           << " native " << native->width << "; clamping";
+        resolved.width = native->width & ~1;
+      }
+      if (resolved.height > native->height) {
+        BOOST_LOG(warning) << "[HestiaAPI] Requested height " << resolved.height
+                           << " exceeds connector " << capture_connector
+                           << " native " << native->height << "; clamping";
+        resolved.height = native->height & ~1;
+      }
+    }
+
+    return resolved;
+  }
+
+
   bool validate_hestia_session_prepare(const nlohmann::json &request, std::string &error) {
     static const std::set<std::string> request_keys {
       "client", "stream", "virtual_display", "app",
@@ -1776,11 +1814,26 @@ namespace confighttp {
 #endif
       const auto client = std::static_pointer_cast<crypto::named_cert_t>(request->userp);
       const auto &client_info = input["client"];
-      const auto resolved = clamp_hestia_stream_resolution(
+      std::string capture_connector;
+      if (!virtual_display["enabled"].get<bool>()) {
+        const auto app_id = app["id"].get<std::string>();
+        for (const auto &app_entry : proc::proc.get_apps()) {
+          if (app_entry.uuid == app_id || app_entry.name == app_id) {
+            capture_connector = app_entry.capture_display;
+            if (capture_connector.empty()) {
+              capture_connector = config::video.physical_capture_probe_connector;
+            }
+            break;
+          }
+        }
+      }
+      const auto resolved = resolve_session_render_size(
         stream["requested_width"].get<int>(),
         stream["requested_height"].get<int>(),
         client_info["display_width"].get<int>(),
-        client_info["display_height"].get<int>()
+        client_info["display_height"].get<int>(),
+        capture_connector,
+        virtual_display["enabled"].get<bool>()
       );
       nvhttp::store_hestia_session_prepare(client->uuid, {
         .virtual_display = virtual_display["enabled"].get<bool>(),

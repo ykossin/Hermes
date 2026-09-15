@@ -2256,6 +2256,24 @@ namespace {
       }
     }
 
+    if (!launch_session->virtual_display && !launch_session->display_name.empty() &&
+        launch_session->width > 0 && launch_session->height > 0) {
+      if (const auto native = display_device::active_connector_resolution(launch_session->display_name)) {
+        if (launch_session->width > native->width) {
+          BOOST_LOG(warning) << "Requested width " << launch_session->width
+                             << " exceeds connector " << launch_session->display_name
+                             << " native " << native->width << "; clamping";
+          launch_session->width = native->width & ~1;
+        }
+        if (launch_session->height > native->height) {
+          BOOST_LOG(warning) << "Requested height " << launch_session->height
+                             << " exceeds connector " << launch_session->display_name
+                             << " native " << native->height << "; clamping";
+          launch_session->height = native->height & ~1;
+        }
+      }
+    }
+
     display_device::configure_display(config::video, *launch_session);
 
     // We should not preserve display state when using virtual display.

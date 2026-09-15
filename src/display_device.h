@@ -53,6 +53,14 @@ namespace display_device {
   [[nodiscard]] std::string
   map_display_name(const std::string &display_name);
 
+  struct physical_resolution_t {
+    int width;
+    int height;
+  };
+
+  [[nodiscard]] std::optional<physical_resolution_t> active_connector_resolution(const std::string &connector_name);
+
+
   /**
    * @brief Configure the display device based on the user configuration and the session information.
    * @note This is a convenience method for calling similar method of a different signature.

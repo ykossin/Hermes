@@ -155,7 +155,7 @@ If the client asks for **more** than the host panel or connector supports, clamp
 
 ### Hestia clients
 
-Use `POST /api/hestia/session/prepare` before launch. Pass `stream.requested_width/height` for the encode target. `client.display_width/height` are used at `session/prepare` to clamp upscale: if the client requests more than its panel size, Hermes stores `min(requested, client display)` for the next launch. Host-native caps for physical tiles are still a follow-up (`resolve_session_render_size`).
+Use `POST /api/hestia/session/prepare` before launch. Pass `stream.requested_width/height` for the encode target. `client.display_width/height` are used at `session/prepare` to clamp upscale: if the client requests more than its panel size, Hermes stores `min(requested, client display)` for the next launch. Host-native caps for physical tiles are applied in `resolve_session_render_size()` during Hestia session prepare and at launch.
 
 ### Practical defaults on kossin
 
@@ -166,6 +166,3 @@ Use `POST /api/hestia/session/prepare` before launch. Pass `stream.requested_wid
 | Two clients at once | Keep one 4K + one 1080p, not two 4K HEVC on Renoir |
 | Client wants 4K, host is 1080p | Cap at 1080p native; do not upscale unless explicitly needed |
 
-### Follow-up (fork)
-
-`resolve_session_render_size()` for physical tiles: query connector native mode and optionally trigger `configure_display()` when `dd.resolution_option = automatic`.

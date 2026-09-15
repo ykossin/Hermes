@@ -763,6 +763,37 @@ namespace display_device {
     });
   }
 
+
+  std::optional<physical_resolution_t> active_connector_resolution(const std::string &connector_name) {
+    if (connector_name.empty()) {
+      return std::nullopt;
+    }
+
+    std::lock_guard lock { DD_DATA.mutex };
+    if (!DD_DATA.sm_instance) {
+      return std::nullopt;
+    }
+
+    const auto devices { DD_DATA.sm_instance->execute([](auto &settings_iface) {
+      return settings_iface.enumAvailableDevices();
+    }) };
+
+    for (const auto &device : devices) {
+      if (device.m_display_name != connector_name && device.m_device_id != connector_name) {
+        continue;
+      }
+      if (!device.m_info) {
+        continue;
+      }
+      return physical_resolution_t {
+        static_cast<int>(device.m_info->m_resolution.m_width),
+        static_cast<int>(device.m_info->m_resolution.m_height),
+      };
+    }
+
+    return std::nullopt;
+  }
+
   std::string map_display_name(const std::string &display_name) {
     std::lock_guard lock { DD_DATA.mutex };
     if (!DD_DATA.sm_instance) {
