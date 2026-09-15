@@ -128,3 +128,39 @@ Hermes must run inside the Plasma session (`systemctl --user restart hermes.serv
 4. Software encoder fallback: if VAAPI or NVENC is unavailable, Hermes may use `libx264`; check Audio/Video in the Web UI.
 5. Physical connector probe uses `/sys/class/drm`; set `physical_capture_probe_connector` if your cable is not `DP-1`.
 6. Before major upgrades, rebase onto MrOz59/main and run unit tests under `tests/unit/platform/`.
+
+## Resolution and auto-scaling
+
+Hermes already receives the client stream size on every launch (`width`, `height`, `fps` from Moonlight, or Hestia `session/prepare` with `requested_width` and `requested_height`). The open gap is **where** that size is applied: virtual outputs, physical DP-1, or only at the encoder.
+
+### Virtual tiles (Monitor 1, Monitor 2, Cursor IDE)
+
+Session-scoped Hermes-KMS outputs are created at `launch_session->width` x `launch_session->height` in `prepare_session_virtual_display()`. If the client picks 1920x1080, the virtual connector should run at 1920x1080, not at `hermes_kms_default_virtual_width`.
+
+`hermes_kms_default_virtual_width = 3840` is only used for KScreen layout math when the output size is not known yet. It does not force the stream to 4K. For less idle overhead you can lower it to 1920; streaming still follows the client request.
+
+### Physical tile (Desktop Real)
+
+Capture is always at the native mode of `DP-1` (often 3840x2160). If the client asks for less:
+
+1. **Encode-scale (default today):** KMS captures full 4K, VAAPI encodes to the client size. Simple, works without changing the desktop, but costs more GPU on Renoir.
+2. **Host modeset (better for a 1080p phone or tablet):** enable display-device resolution change in `hermes.conf` (`dd.configuration_option = ensure_active`, `dd.resolution_option = automatic`) and turn on Optimize game settings in the client. Hermes modesets `DP-1` for the session and restores on exit.
+
+If the client asks for **more** than the host panel or connector supports, clamp to the native max mode and log a warning. Upscaling in the encoder is possible but wastes bandwidth and looks soft; prefer capping in Hestia prepare or at launch.
+
+### Hestia clients
+
+Use `POST /api/hestia/session/prepare` before launch. Pass `stream.requested_width/height` for the encode target. Fields `client.display_width/height` are validated today but not yet used to clamp; a sensible rule is `effective = min(requested, host_native_max)` for upscale attempts and `effective = requested` for downscale on virtual outputs.
+
+### Practical defaults on kossin
+
+| Scenario | Recommendation |
+|----------|----------------|
+| Phone or tablet 1080p on Monitor 1 | Client 1920x1080; virtual output matches; zero-copy at 1080p |
+| Laptop 1080p on Desktop Real 4K | Prefer host modeset to 1080p, or accept encode-scale |
+| Two clients at once | Keep one 4K + one 1080p, not two 4K HEVC on Renoir |
+| Client wants 4K, host is 1080p | Cap at 1080p native; do not upscale unless explicitly needed |
+
+### Future code (fork)
+
+Single helper `resolve_session_render_size()` shared by virtual prepare and physical launch: query connector native mode, clamp requested, optionally trigger `configure_display()` for physical tiles when `dd.resolution_option = automatic`.
