@@ -1025,10 +1025,6 @@ namespace platf {
             continue;
           }
 
-          const bool want_hermes_connector =
-            connector_name.rfind("Virtual-", 0) == 0 ||
-            connector_name.rfind("HERMES-", 0) == 0 ||
-            connector_name.rfind("VIRTUAL-", 0) == 0;
           if (virtual_card.empty() && card.is_hermes_kms() && connector_name.empty()) {
             continue;
           }
