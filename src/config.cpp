@@ -1500,7 +1500,7 @@ namespace config {
     if (entry_name.size() < 6 || entry_name.compare(0, 4, "card") != 0) {
       return {};
     }
-    const auto dash = entry_name.find(-, 4);
+    const auto dash = entry_name.find('-', 4);
     if (dash == std::string::npos || dash + 1 >= entry_name.size()) {
       return {};
     }
