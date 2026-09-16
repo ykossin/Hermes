@@ -14,6 +14,7 @@
 #include <cstdio>
 #include <cerrno>
 #include <csignal>
+#include <optional>
 #include <string_view>
 #include <utility>
 
@@ -1202,39 +1203,161 @@ std::string get_local_ip_for_gateway() {
     return std::make_unique<linux_high_precision_timer>();
   }
 
+  namespace {
+    void
+    close_fds_from(int first_fd) {
+      const int openmax = static_cast<int>(sysconf(_SC_OPEN_MAX));
+      for (int fd = first_fd; fd < openmax; ++fd) {
+        close(fd);
+      }
+    }
+
+    bool
+    write_to_isolated_process(const std::string &content, const char *executable, char *const argv[]) {
+      int input_pipe[2];
+      if (pipe(input_pipe) != 0) {
+        return false;
+      }
+
+      const pid_t child = fork();
+      if (child == 0) {
+        dup2(input_pipe[0], STDIN_FILENO);
+        close(input_pipe[0]);
+        close(input_pipe[1]);
+        close_fds_from(STDERR_FILENO + 1);
+        execvp(executable, argv);
+        _exit(127);
+      }
+
+      if (child < 0) {
+        close(input_pipe[0]);
+        close(input_pipe[1]);
+        return false;
+      }
+
+      close(input_pipe[0]);
+      sigset_t sigpipe_mask;
+      sigemptyset(&sigpipe_mask);
+      sigaddset(&sigpipe_mask, SIGPIPE);
+      sigset_t previous_mask;
+      pthread_sigmask(SIG_BLOCK, &sigpipe_mask, &previous_mask);
+      size_t written = 0;
+      bool broken_pipe = false;
+      while (written < content.size()) {
+        const ssize_t result = write(input_pipe[1], content.data() + written, content.size() - written);
+        if (result <= 0) {
+          broken_pipe = result < 0 && errno == EPIPE;
+          break;
+        }
+        written += static_cast<size_t>(result);
+      }
+      if (broken_pipe) {
+        siginfo_t signal_info {};
+        sigwaitinfo(&sigpipe_mask, &signal_info);
+      }
+      pthread_sigmask(SIG_SETMASK, &previous_mask, nullptr);
+      const bool wrote_all = written == content.size();
+      close(input_pipe[1]);
+
+      int status = 0;
+      if (waitpid(child, &status, 0) < 0) {
+        return false;
+      }
+
+      return wrote_all && WIFEXITED(status) && WEXITSTATUS(status) == 0;
+    }
+
+    std::optional<std::string>
+    read_from_isolated_process(const char *executable, char *const argv[]) {
+      int output_pipe[2];
+      if (pipe(output_pipe) != 0) {
+        return std::nullopt;
+      }
+
+      const pid_t child = fork();
+      if (child == 0) {
+        dup2(output_pipe[1], STDOUT_FILENO);
+        close(output_pipe[0]);
+        close(output_pipe[1]);
+        close_fds_from(STDERR_FILENO + 1);
+        execvp(executable, argv);
+        _exit(127);
+      }
+
+      if (child < 0) {
+        close(output_pipe[0]);
+        close(output_pipe[1]);
+        return std::nullopt;
+      }
+
+      close(output_pipe[1]);
+      constexpr size_t max_clipboard_bytes = 64 * 1024;
+      std::string content;
+      char buffer[4096];
+      bool read_failed = false;
+      while (true) {
+        const ssize_t bytes_read = read(output_pipe[0], buffer, sizeof(buffer));
+        if (bytes_read == 0) {
+          break;
+        }
+        if (bytes_read < 0) {
+          if (errno == EINTR) {
+            continue;
+          }
+          read_failed = true;
+          break;
+        }
+        if (content.size() + static_cast<size_t>(bytes_read) > max_clipboard_bytes) {
+          BOOST_LOG(warning) << "Clipboard exceeds the 64 KiB Hestia limit";
+          read_failed = true;
+          break;
+        }
+        content.append(buffer, static_cast<size_t>(bytes_read));
+      }
+      close(output_pipe[0]);
+
+      int status = 0;
+      if (read_failed || waitpid(child, &status, 0) < 0 || !WIFEXITED(status) || WEXITSTATUS(status) != 0) {
+        return std::nullopt;
+      }
+
+      return content;
+    }
+  }  // namespace
+
   std::string
   get_clipboard() {
     if (!clipboard_available()) {
       return "";
     }
 
-    const char *command = window_system == window_system_e::WAYLAND ?
-                            "wl-paste --no-newline --type text/plain" :
-                            "xclip -selection clipboard -out";
-    FILE *pipe = popen(command, "r");
-    if (pipe == nullptr) {
-      BOOST_LOG(warning) << "Unable to read the clipboard";
-      return "";
-    }
-
-    constexpr size_t max_clipboard_bytes = 64 * 1024;
-    std::string content;
-    char buffer[4096];
-    while (const size_t bytes_read = fread(buffer, 1, sizeof(buffer), pipe)) {
-      if (content.size() + bytes_read > max_clipboard_bytes) {
-        BOOST_LOG(warning) << "Clipboard exceeds the 64 KiB Hestia limit";
-        pclose(pipe);
-        return "";
+    if (window_system == window_system_e::WAYLAND) {
+      char *argv[] = {
+        (char *) "wl-paste",
+        (char *) "--no-newline",
+        (char *) "--type",
+        (char *) "text/plain",
+        nullptr,
+      };
+      if (const auto content = read_from_isolated_process("wl-paste", argv)) {
+        return *content;
       }
-      content.append(buffer, bytes_read);
-    }
-
-    if (pclose(pipe) != 0) {
       BOOST_LOG(warning) << "Unable to read the clipboard";
       return "";
     }
 
-    return content;
+    char *argv[] = {
+      (char *) "xclip",
+      (char *) "-selection",
+      (char *) "clipboard",
+      (char *) "-out",
+      nullptr,
+    };
+    if (const auto content = read_from_isolated_process("xclip", argv)) {
+      return *content;
+    }
+    BOOST_LOG(warning) << "Unable to read the clipboard";
+    return "";
   }
 
   bool
@@ -1244,15 +1367,13 @@ std::string get_local_ip_for_gateway() {
     }
 
     if (window_system == window_system_e::WAYLAND) {
-      FILE *pipe = popen("wl-copy --type text/plain", "w");
-      if (pipe == nullptr) {
-        BOOST_LOG(warning) << "Unable to write the Wayland clipboard";
-        return false;
-      }
-
-      const bool wrote_all = fwrite(content.data(), 1, content.size(), pipe) == content.size();
-      const int close_status = pclose(pipe);
-      const bool success = wrote_all && close_status == 0;
+      char *argv[] = {
+        (char *) "wl-copy",
+        (char *) "--type",
+        (char *) "text/plain",
+        nullptr,
+      };
+      const bool success = write_to_isolated_process(content, "wl-copy", argv);
       if (!success) {
         BOOST_LOG(warning) << "Unable to write the Wayland clipboard";
       }
